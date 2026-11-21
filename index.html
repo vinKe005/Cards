@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sorteio de Desafios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Egyptian+Hieroglyphs&family=Cinzel:wght@600;700&family=Spectral:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;min-height:100%;background:#1a0f05}
+body{min-height:100vh;display:grid;place-items:center;padding:20px;color:#f3e2bc;font:16px/1.5 Spectral,Georgia,serif;
+ background:radial-gradient(ellipse 80% 60% at 50% 30%,#5a3a18 0,#2a1808 55%,#120a03 100%)}
+.hg{font-family:"Noto Sans Egyptian Hieroglyphs",serif}
+.door{width:min(420px,100%);text-align:center;padding:40px 28px 32px;position:relative;
+ background:linear-gradient(rgba(24,15,6,.9),rgba(14,9,3,.94));border:1px solid #d6aa55;border-radius:3px;
+ box-shadow:inset 0 0 0 6px rgba(0,0,0,.35),inset 0 0 0 7px rgba(214,170,85,.35),0 30px 80px rgba(0,0,0,.6)}
+.frieze{font-size:20px;letter-spacing:.3em;color:#e9c46e;white-space:nowrap;overflow:hidden;border-block:1px solid rgba(214,170,85,.6);background:rgba(16,30,58,.8);padding:6px 0;margin:-14px -10px 26px}
+.eye{font-size:56px;line-height:1.1;color:#e9c46e;text-shadow:0 0 20px rgba(233,196,110,.35)}
+h1{margin:8px 0 6px;font:700 28px/1.1 Cinzel,serif;color:#f3d48a}
+p{margin:0 0 22px;color:#d9c49a;font-style:italic}
+form{display:flex;flex-direction:column;gap:12px}
+label{font:600 13px Cinzel,serif;color:#d6aa55;text-align:left}
+input{width:100%;min-height:50px;padding:0 16px;font:600 20px Cinzel,serif;letter-spacing:.3em;text-align:center;color:#fbecc8;background:rgba(0,0,0,.45);border:1px solid rgba(214,170,85,.7);border-radius:2px;outline:none}
+input:focus{border-color:#f3d48a;box-shadow:0 0 0 3px rgba(243,212,138,.25)}
+button{min-height:52px;border-radius:3px;font:700 17px Cinzel,serif;letter-spacing:.04em;cursor:pointer;color:#241304;border:1px solid #f6e0a6;
+ background:linear-gradient(180deg,#f4d892,#d1a04a 52%,#a3712a);box-shadow:inset 0 0 0 3px rgba(90,52,12,.35),0 8px 22px rgba(0,0,0,.45)}
+button:disabled{opacity:.6;cursor:wait}
+button:focus-visible{outline:2px solid #f3d48a;outline-offset:3px}
+.msg{min-height:1.5em;margin-top:6px;font-size:15px;color:#ffb38a}
+.door.err{animation:shake .4s}
+@keyframes shake{25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-4px)}}
+@media(prefers-reduced-motion:reduce){.door.err{animation:none}}
+</style>
+</head>
+<body>
+<main class="door" id="door">
+ <div class="frieze hg" aria-hidden="true">𓇳𓋹𓂀𓆣𓊽𓋹𓇳𓋹𓂀𓆣𓊽𓋹𓇳𓋹𓂀𓆣𓊽</div>
+ <div class="eye hg" aria-hidden="true">𓂀</div>
+ <h1>Sorteio de Desafios</h1>
+ <p>O templo está selado. Diga a senha para entrar.</p>
+ <form id="f">
+  <label for="pw">Senha</label>
+  <input id="pw" type="password" inputmode="numeric" autocomplete="current-password" required autofocus>
+  <button id="go" type="submit">Entrar</button>
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+ </form>
+</main>
+<script>
+{
+const $=id=>document.getElementById(id);
+let blob=null,meta=null;
+const load=Promise.all([fetch('dados.enc').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}),fetch('meta.json').then(r=>r.json())]).then(([b,m])=>{blob=new Uint8Array(b);meta=m});
+async function open(pw){
+ await load;
+ const salt=blob.slice(0,16),iv=blob.slice(16,28),ct=blob.slice(28);
+ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+ const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:meta.it,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+ const html=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ct));
+ try{sessionStorage.setItem('sd-pw',pw)}catch(e){}
+ document.open();document.write(html);document.close();
+}
+$('f').addEventListener('submit',async e=>{
+ e.preventDefault();const pw=$('pw').value;$('go').disabled=true;$('go').textContent='Abrindo o selo…';$('msg').textContent='';
+ try{await open(pw)}catch(err){
+  $('go').disabled=false;$('go').textContent='Entrar';
+  $('msg').textContent=blob?'Senha incorreta. Tente de novo.':'Não foi possível carregar o site. Verifique a conexão.';
+  const d=$('door');d.classList.remove('err');void d.offsetWidth;d.classList.add('err');$('pw').select()}
+});
+let saved=null;try{saved=sessionStorage.getItem('sd-pw')}catch(e){}
+if(saved)open(saved).catch(()=>{try{sessionStorage.removeItem('sd-pw')}catch(e){}});
+}
+</script>
+</body>
+</html>
